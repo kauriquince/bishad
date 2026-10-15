@@ -26,5 +26,13 @@
     "ios": "Core ML / MLX, GGUF via Hugging Face CDN",
     "android": "ONNX Runtime / llama.cpp, same GGUF files",
     "first_launch": "download smallest recommended model, show progress bar, cache on device"
+  },
+  "phone": {
+    "cdn_base": "https://huggingface.co",
+    "recommended": [
+      {"name": "llama3.2", "size_gb": 2.0, "quantization": "Q4_K_M", "min_ram_gb": 4},
+      {"name": "llama3.1", "size_gb": 4.9, "quantization": "Q4_K_M", "min_ram_gb": 8},
+      {"name": "qwen2.5", "size_gb": 4.7, "quantization": "Q4_K_M", "min_ram_gb": 8}
+    ]
   }
 }
