@@ -1,14 +1,18 @@
-# Tabitha & Bishad v2 — Local AI
+# Tabitha & Bishad v3 — PC-first, auto-start local AI
 
-1. Install/start Ollama (https://ollama.com) and pull a model, e.g. `ollama pull llama3.2`
-   OR start LM Studio local API server (default port 1234).
-2. In this folder run: `python server.py`
-3. Open http://127.0.0.1:8765 in your browser.
-4. Choose AI dialogue; click Detect local models; select provider and model. Press Start.
-5. Default Ollama at 127.0.0.1:11434; optionally override with `LOCAL_AI_URL`.
-6. Optional OpenAI mode uses `OPENAI_API_KEY` and provider OpenAI.
+## Quick start (PC)
 
-No models bundled, downloaded or installed by this project.
-Original Tabitha faces preserved inside HTML; Bishad fictional generated character faces.
-No live NZ news feed; topics are fictional dialogues about policy tradeoffs.
+1. Install [Ollama](https://ollama.com) (or LM Studio).
+2. Double-click `start.bat` (Windows) or run `./start.sh` (Mac/Linux).
+3. The script checks whether Ollama is running; if not, it starts it, waits for the API, then launches `server.py`.
+4. Open http://127.0.0.1:8765 — choose AI dialogue, click Detect local models, pick one, press Start.
+
+No models are bundled. The first chat downloads whatever you select from Ollama's registry (GGUF under the hood).
+
+## Roadmap
+
+- **v3 (now):** PC auto-start wrapper + model manifest + health checks.
+- **v4:** Phone app — iOS (Core ML / MLX) and Android (ONNX Runtime / llama.cpp), downloading the same GGUF models from a CDN on first launch.
+- Models live outside the repo; a `models.json` manifest points at Hugging Face / Ollama registry URLs.
+
 This is parody, not quotes or a real-life relationship.

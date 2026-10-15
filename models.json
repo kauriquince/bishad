@@ -1,0 +1,30 @@
+{
+  "version": "3.0.0",
+  "updated": "2026-10-15",
+  "backends": {
+    "ollama": {
+      "url": "http://127.0.0.1:11434",
+      "endpoint": "/api/chat",
+      "default_model": "llama3.2",
+      "recommended": [
+        {"name": "llama3.2", "size_gb": 2.0, "quality": "good", "notes": "smallest solid default"},
+        {"name": "llama3.1:8b", "size_gb": 4.7, "quality": "better", "notes": "stronger reasoning"},
+        {"name": "qwen2.5:7b", "size_gb": 4.7, "quality": "better", "notes": "good at structured JSON output"}
+      ]
+    },
+    "lmstudio": {
+      "url": "http://127.0.0.1:1234",
+      "endpoint": "/v1/chat/completions",
+      "default_model": "local-model"
+    },
+    "openai": {
+      "env_key": "OPENAI_API_KEY",
+      "default_model": "gpt-4.1-mini"
+    }
+  },
+  "phone_roadmap": {
+    "ios": "Core ML / MLX, GGUF via Hugging Face CDN",
+    "android": "ONNX Runtime / llama.cpp, same GGUF files",
+    "first_launch": "download smallest recommended model, show progress bar, cache on device"
+  }
+}
