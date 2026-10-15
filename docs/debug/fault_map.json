@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "features": [
+    {
+      "id": "FC-CONVERSATION",
+      "symptoms": [
+        "wrong character answers",
+        "reply to old message",
+        "duplicate response",
+        "thread conversation mixed"
+      ],
+      "first_check": [
+        "app/conversation/thread_router.py",
+        "app/conversation/reply_validator.py",
+        "app/conversation/thread_store.py"
+      ],
+      "tests": [
+        "tests/test_thread_router.py"
+      ]
+    },
+    {
+      "id": "FC-EXPRESSION",
+      "symptoms": [
+        "wrong character image",
+        "missing face",
+        "broken expression"
+      ],
+      "first_check": [
+        "assets/characters/README.md"
+      ],
+      "tests": [],
+      "status": "asset migration pending"
+    },
+    {
+      "id": "FC-VIDEO",
+      "symptoms": [
+        "video encoder errors",
+        "video FPS drop"
+      ],
+      "first_check": [],
+      "tests": [],
+      "status": "not implemented in Family Chaos; project-specific example only"
+    }
+  ]
+}
