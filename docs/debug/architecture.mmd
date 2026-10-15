@@ -1,0 +1,9 @@
+flowchart LR
+    UI[Character UI - migration pending] --> ROUTE[thread_router.py]
+    ROUTE --> STORE[thread_store.py]
+    ROUTE --> VALID[reply_validator.py]
+    STORE --> MSG[messages.py]
+    VALID --> STORE
+    VALID --> MSG
+    ASSET[Original named image assets - pending] --> UI
+    MODEL[Local model adapter - pending] --> ROUTE
