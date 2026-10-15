@@ -1,0 +1,185 @@
+name: Extract Assets
+
+on:
+  workflow_dispatch:
+
+jobs:
+  extract:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout v4-phone
+        uses: actions/checkout@v4
+        with:
+          ref: v4-phone
+          fetch-depth: 0
+
+      - name: Locate Family Chaos index.html files
+        shell: bash
+        run: |
+          set -e
+          echo "Searching for Family Chaos index.html files..."
+          FOUND=0
+          for d in /d/Family\ Chaos /d/Games /d/Bishad /d/Projects \
+                   "$HOME/Desktop" "$HOME/Documents" "$HOME/Downloads" "$HOME/OneDrive"; do
+            if [ -d "$d" ]; then
+              echo "Scanning $d"
+              find "$d" -maxdepth 4 -name 'index.html' -size +1M 2>/dev/null | while read f; do
+                if grep -q 'FACES' "$f" 2>/dev/null; then
+                  echo "FOUND: $f"
+                  FOUND=1
+                fi
+              done
+            fi
+          done
+          if [ "$FOUND" -eq 0 ]; then
+            echo "No FACES-containing index.html found on this machine."
+            echo "The 16MB V17-V34 builds and the 684KB chat build are expected locally."
+            exit 1
+          fi
+
+      - name: Extract PNGs from FACES data URIs
+        shell: bash
+        run: |
+          set -e
+          python3 << 'PY'
+import re, base64, os, json
+
+root = 'bishad-assets'
+os.makedirs(root, exist_ok=True)
+
+# Discover index.html files containing FACES
+files = []
+for dirpath, dirnames, filenames in os.walk('.'):
+    # skip git and existing asset dirs
+    if '.git' in dirpath or 'bishad-assets' in dirpath:
+        continue
+    for fn in filenames:
+        if fn.endswith('.html'):
+            p = os.path.join(dirpath, fn)
+            try:
+                with open(p, 'r', encoding='utf-8', errors='ignore') as f:
+                    txt = f.read()
+                if 'FACES' in txt and 'data:image' in txt:
+                    files.append(p)
+            except Exception:
+                pass
+
+print(f"Found {len(files)} candidate HTML files:")
+for p in files:
+    print(' ', p)
+
+counts = {}  # character -> count
+all_keys = set()
+
+for p in files:
+    with open(p, 'r', encoding='utf-8', errors='ignore') as f:
+        txt = f.read()
+    # Find FACES = { ... } block (non-greedy across lines)
+    m = re.search(r'FACES\s*=\s*\{', txt)
+    if not m:
+        continue
+    start = m.end() - 1
+    # brace match
+    depth = 0
+    end = None
+    for i in range(start, len(txt)):
+        if txt[i] == '{':
+            depth += 1
+        elif txt[i] == '}':
+            depth -= 1
+            if depth == 0:
+                end = i + 1
+                break
+    if end is None:
+        continue
+    block = txt[start:end]
+    # Split top-level keys: "key": [ ... ]
+    for km in re.finditer(r'["\']([A-Za-z0-9_]+)["\']\s*:\s*\[', block):
+        key = km.group(1).lower()
+        all_keys.add(key)
+        kstart = km.end() - 1
+        depth = 0
+        kend = None
+        for j in range(kstart, len(block)):
+            if block[j] == '[':
+                depth += 1
+            elif block[j] == ']':
+                depth -= 1
+                if depth == 0:
+                    kend = j + 1
+                    break
+        if kend is None:
+            continue
+        arr = block[kstart:kend]
+        uris = re.findall(r'data:image/[^;]+;base64,([A-Za-z0-9+/=]+)', arr)
+        sub = os.path.join(root, key)
+        os.makedirs(sub, exist_ok=True)
+        for idx, u in enumerate(uris, 1):
+            try:
+                data = base64.b64decode(u)
+                # basic PNG check
+                if data[:8] == b'\x89PNG\r\n\x1a\n':
+                    path = os.path.join(sub, f'{key}_{idx:02d}.png')
+                    with open(path, 'wb') as out:
+                        out.write(data)
+                    counts[key] = counts.get(key, 0) + 1
+            except Exception as e:
+                print(f'  decode error in {key} idx {idx}: {e}')
+
+print('FACES keys found:', sorted(all_keys))
+for k, v in sorted(counts.items()):
+    print(f'  {k}: {v} PNGs')
+
+# Marama check
+if not any('marama' in k or 'davis' in k for k in all_keys):
+    print('NO MARAMA/DAVIS key in FACES objects.')
+    # secondary search for marama-labeled images in sidebar/UI strings
+    found_m = False
+    for p in files:
+        with open(p, 'r', encoding='utf-8', errors='ignore') as f:
+            t = f.read()
+        if re.search(r'marama', t, re.I):
+            print(f'  Marama mention in {p}')
+            found_m = True
+    if not found_m:
+        print('  No Marama mentions in any scanned HTML.')
+
+with open(os.path.join(root, 'extraction_report.json'), 'w') as f:
+    json.dump({'keys': sorted(all_keys), 'counts': counts, 'files_scanned': files}, f, indent=2)
+PY
+
+      - name: Report and stage
+        shell: bash
+        run: |
+          set -e
+          echo "=== Extraction report ==="
+          cat bishad-assets/extraction_report.json 2>/dev/null || echo "No report generated"
+          echo "=== PNG inventory ==="
+          find bishad-assets -name '*.png' | sort | head -200
+          echo "=== Total PNG count ==="
+          find bishad-assets -name '*.png' | wc -l
+
+      - name: Git LFS setup and commit
+        shell: bash
+        run: |
+          set -e
+          if command -v git-lfs &> /dev/null; then
+            git lfs track "*.png"
+            git add .gitattributes
+          else
+            echo "Git LFS not installed; committing PNGs directly"
+          fi
+          git config user.name "kauriquince"
+          git config user.email "kauriquince@users.noreply.github.com"
+          git add bishad-assets/
+          git status
+          git commit -m "v4: extract character expression PNGs from FACES data URIs (tab/bish/win/hana + marama if found)" || echo "Nothing to commit"
+          git push origin v4-phone
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bishad-assets
+          path: bishad-assets/
+          retention-days: 30
