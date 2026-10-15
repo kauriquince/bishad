@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "modules": [
+    {
+      "id": "FC-MSG",
+      "path": "app/conversation/messages.py",
+      "purpose": "message and pending reply types",
+      "depends_on": [],
+      "tests": [
+        "tests/test_thread_router.py"
+      ]
+    },
+    {
+      "id": "FC-STORE",
+      "path": "app/conversation/thread_store.py",
+      "purpose": "isolated in-memory thread state",
+      "depends_on": [
+        "FC-MSG"
+      ],
+      "tests": [
+        "tests/test_thread_router.py"
+      ]
+    },
+    {
+      "id": "FC-VALIDATE",
+      "path": "app/conversation/reply_validator.py",
+      "purpose": "reject stale replies",
+      "depends_on": [
+        "FC-STORE",
+        "FC-MSG"
+      ],
+      "tests": [
+        "tests/test_thread_router.py"
+      ]
+    },
+    {
+      "id": "FC-ROUTE",
+      "path": "app/conversation/thread_router.py",
+      "purpose": "send, request and correlate messages",
+      "depends_on": [
+        "FC-VALIDATE",
+        "FC-STORE",
+        "FC-MSG"
+      ],
+      "tests": [
+        "tests/test_thread_router.py"
+      ]
+    }
+  ],
+  "migration_status": "modular prototype; old V3/V34 implementation not integrated"
+}
