@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parent
 LOCAL_URL=os.getenv('LOCAL_AI_URL','http://127.0.0.1:11434')
 BACKEND=os.getenv('CHAT_BACKEND','ollama').lower()
 MODEL=os.getenv('LOCAL_AI_MODEL','')
-SYSTEM='''You are the dialogue writer for a satirical FICTIONAL New Zealand couple, Tabitha and Bishad. This is not an actual relationship between public figures and no dialogue is a real quote. Write just the next message in an ongoing relationship argument. The woman Tabitha is warm, cheeky, extremely sharp, politically Green-leaning, strong on accessible healthcare, prevention and nature. She asks logically connected follow-up questions, calls out weak reasoning, but never invents facts. She begins kind and can turn sassy; occasionally says "aye", "aye like", or "babe" in a natural Kiwi rhythm, but not every message. She's confident, not infallible: she can admit a valid counterpoint without surrendering her values. Bishad is her fictional mullet-wearing, National-leaning boyfriend, well-intentioned but accident-prone with words, offering real objections about public budgets, implementation and housing supply. He's not constantly stupid, sometimes he has a fair point. They like each other, remember personal jokes, and regularly interrupt politics with small affectionate digs, reconciliations or shared life details (tea, dishes, the late bus, forgetting groceries, a date night). The relationship is MESSY but not cruel, coercive, threatening, or abusive. Avoid repeating the same gotcha. No real-time news assertions unless a provided verified news extract is supplied. The next message should REFER to the last line, not reset the topic. Keep the exchange flowing for 30+ turns. Prefer 1-3 conversational sentences, maximum 65 words. Output ONLY JSON {"line":"...", "expression":number, "mood":"..."}. Tabitha expression 1-42, Bishad 1-20. Choose real matching expression indices.''' 
+SYSTEM='''You are the dialogue writer for a satirical FICTIONAL New Zealand couple, Tabitha and Bishad. This is not an actual relationship between public figures and no dialogue is a real quote. Write just the next message in an ongoing relationship argument. The woman Tabitha is warm, cheeky, extremely sharp, politically Green-leaning, strong on accessible healthcare, prevention and nature. She asks logically connected follow-up questions, calls out weak reasoning, but never invents facts. She begins kind and can turn sassy; occasionally says "aye", "aye like", or "babe" in a natural Kiwi rhythm, but not every message. She's confident, not infallible: she can admit a valid counterpoint without surrendering her values. Bishad is her fictional mullet-wearing, National-leaning boyfriend, well-intentioned but accident-prone with words, offering real objections about public budgets, implementation and housing supply. He's not constantly stupid, sometimes he has a fair point. They like each other, remember personal jokes, and regularly interrupt politics with small affectionate digs, reconciliations or shared life details (tea, dishes, the late bus, forgetting groceries, a date night). The relationship is MESSY but not cruel, coercive, threatening, or abusive. Avoid repeating the same gotcha. No real-time news assertions unless a provided verified news extract is supplied. The next message must REACT to the last line without quoting, paraphrasing or restating it. Supply ONLY the new contribution by the selected speaker. Never include speaker labels, prior dialogue, a transcript, or a recap. Do not restart the topic. Keep the exchange flowing for 30+ turns. Prefer 1-3 conversational sentences, maximum 65 words. Output ONLY JSON {"line":"...", "expression":number, "mood":"..."}. Tabitha expression 1-42, Bishad 1-20. Choose real matching expression indices.''' 
 
 def call_json(url,payload,headers=None):
     req=urllib.request.Request(url,json.dumps(payload).encode(),{'Content-Type':'application/json',**(headers or {})})
@@ -23,6 +23,26 @@ def models():
             found.append({'backend':name,'models':names})
         except Exception: pass
     return found
+
+def clean_reply(line, history, who):
+    """Remove echoed conversation context without destroying a genuine new reply."""
+    line=str(line).strip()
+    line=re.sub(r'^(?:Tabitha|Bishad|Bishop Chad)\\s*:\\s*','',line,flags=re.I)
+    if not history: return line[:450]
+    previous=[]
+    for row in history[-8:]:
+        if isinstance(row,dict):
+            t=str(row.get('text','')).strip()
+            if t: previous.append(t)
+    # Drop whole earlier turns if the model prefixed a transcript.
+    for old in reversed(previous):
+        if line.lower().startswith(old.lower()):
+            line=line[len(old):].lstrip(' \\n\\t:-—"')
+            line=re.sub(r'^(?:Tabitha|Bishad|Bishop Chad)\\s*:\\s*','',line,flags=re.I)
+    # Avoid sending an exact duplicate of recent chat.
+    if any(line.casefold()==old.casefold() for old in previous):
+        return ''
+    return line[:450]
 
 def generate(body):
     who='tab' if body.get('speaker')=='tab' else 'bish'
@@ -49,7 +69,9 @@ def generate(body):
     else:raise ValueError('Unknown backend')
     match=re.search(r'\{.*\}',txt,re.S)
     obj=json.loads(match.group(0)) if match else {'line':txt,'expression':11 if who=='tab' else 8}
-    return {'line':str(obj.get('line','')).strip()[:450], 'expression':max(1,min(42 if who=='tab' else 20,int(obj.get('expression',11 if who=='tab' else 8)))),'mood':str(obj.get('mood',''))[:32]}
+    line=clean_reply(obj.get('line',''),history,who)
+    if not line: raise ValueError('Model repeated an earlier message; request a fresh turn')
+    return {'line':line, 'expression':max(1,min(42 if who=='tab' else 20,int(obj.get('expression',11 if who=='tab' else 8)))),'mood':str(obj.get('mood',''))[:32]}
 
 class Handler(BaseHTTPRequestHandler):
     def respond(self,obj,code=200):
